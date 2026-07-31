@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+
+# Thay <URL-TRANG-CUA-BAN> bang dia chi GitHub Pages that, vi du:
+# https://tenban.github.io/ty-phu-am-thuc/
+Sitemap: <URL-TRANG-CUA-BAN>/sitemap.xml
