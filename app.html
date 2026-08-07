@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Tỷ Phú Ẩm Thực — Ứng dụng đồng hành</title>
+<meta name="description" content="Ứng dụng đồng hành cho boardgame Tỷ Phú Ẩm Thực: gieo xúc xắc, rút thẻ, ghi điểm và tra luật chơi.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#EE8C6A">
+<link rel="icon" type="image/png" href="assets/logo-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700;800&family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ============================================================================
+   TỶ PHÚ ẨM THỰC — bản ứng dụng
+   Dùng nguyên bảng màu, phông chữ và hình ảnh của trang chính (index.html).
+   Một tệp duy nhất, không cần thư viện ngoài.
+   ============================================================================ */
+:root{
+  --coral:#EE8C6A; --coral-dark:#DE7458; --coral-soft:#F8CDBB; --peach:#F3A985;
+  --yellow:#F1B24F; --yellow-soft:#FBDFA6; --cream:#FBE6C4;
+  --green:#A6CE86;  --green-soft:#CBE3B4; --green-dark:#5CA277;
+  --ink:#40302A;    --ink-soft:#8A7367;   --white:#fff; --paper:#FBF6EE;
+  --line:rgba(64,48,42,.10);
+  --brown:#5A3D1C;
+  --shadow:0 22px 50px -28px rgba(64,48,42,.42);
+  --r-lg:26px; --r-md:18px; --r-sm:13px;
+  --bar:74px;                       /* chiều cao thanh tab dưới */
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%}
+body{font-family:'Be Vietnam Pro',sans-serif;color:var(--ink);font-size:15px;line-height:1.6;
+  background:linear-gradient(160deg,#CDE7B6 0%,#F1F1DA 42%,#FBE6C4 70%,#F3A985 100%);
+  background-attachment:fixed;min-height:100vh;
+  display:flex;align-items:center;justify-content:center;padding:22px}
+h1,h2,h3,h4{font-family:'Baloo 2',sans-serif;font-weight:700;line-height:1.15}
+img{display:block;max-width:100%}
+button{font:inherit;color:inherit;border:none;background:none;cursor:pointer}
+::selection{background:var(--coral);color:#fff}
+
+/* ---------------------------------------------------------- khung điện thoại */
+.phone{position:relative;width:min(430px,100%);height:min(880px,calc(100vh - 44px));
+  background:var(--paper);border-radius:38px;overflow:hidden;display:flex;flex-direction:column;
+  box-shadow:0 40px 80px -30px rgba(64,48,42,.6),0 0 0 9px #2E2823,0 0 0 11px #4A423B}
+@media (max-width:560px){
+  body{padding:0;display:block;background:var(--paper)}
+  .phone{width:100%;height:100vh;height:100dvh;border-radius:0;box-shadow:none}
+}
+
+/* ------------------------------------------------------------ màn hình chờ */
+.splash{position:absolute;inset:0;z-index:60;background:var(--paper);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;
+  transition:opacity .55s ease,visibility .55s}
+.splash img{width:172px;animation:pop .9s cubic-bezier(.2,.9,.25,1) both}
+.splash .bar{width:150px;height:5px;border-radius:99px;background:rgba(64,48,42,.12);overflow:hidden}
+.splash .bar i{display:block;height:100%;width:0;border-radius:99px;
+  background:linear-gradient(90deg,var(--green-dark),var(--yellow),var(--coral));
+  animation:fill 1s ease forwards}
+.splash p{font-size:13px;color:var(--ink-soft);font-weight:600;letter-spacing:.04em}
+body.ready .splash{opacity:0;visibility:hidden}
+@keyframes pop{from{opacity:0;transform:scale(.72) translateY(20px)}to{opacity:1;transform:none}}
+@keyframes fill{to{width:100%}}
+
+/* ------------------------------------------------------------- thanh trên */
+.appbar{flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:14px 18px 12px;
+  background:rgba(251,246,238,.9);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--line);z-index:20}
+.appbar img{height:38px;width:auto}
+.appbar .ttl{flex:1 1 auto;min-width:0}
+.appbar .ttl b{display:block;font-family:'Baloo 2',sans-serif;font-size:17px;line-height:1.2}
+.appbar .ttl span{display:block;font-size:11.5px;color:var(--ink-soft);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.appbar .out{flex:0 0 auto;width:38px;height:38px;border-radius:12px;background:var(--white);
+  border:1px solid var(--line);display:grid;place-items:center;color:var(--brown)}
+.appbar .out:active{transform:scale(.92)}
+
+/* ------------------------------------------------------------- các màn hình */
+.screens{flex:1 1 auto;position:relative;overflow:hidden}
+.screen{position:absolute;inset:0;overflow-y:auto;overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;padding:16px 16px calc(var(--bar) + 22px);
+  opacity:0;visibility:hidden;transform:translateY(10px);
+  transition:opacity .28s ease,transform .28s ease,visibility .28s}
+.screen.on{opacity:1;visibility:visible;transform:none}
+
+/* ------------------------------------------------------------ thanh tab dưới */
+.tabbar{position:absolute;left:0;right:0;bottom:0;height:var(--bar);z-index:30;
+  display:grid;grid-template-columns:repeat(5,1fr);
+  background:rgba(255,255,255,.94);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
+  border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+.tab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  font-size:10.5px;font-weight:700;color:var(--ink-soft);position:relative;transition:color .22s}
+.tab svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.8;
+  stroke-linecap:round;stroke-linejoin:round;transition:transform .3s cubic-bezier(.34,1.56,.64,1)}
+.tab.on{color:var(--coral-dark)}
+.tab.on svg{transform:translateY(-2px) scale(1.1)}
+.tab.on::before{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);
+  width:30px;height:3px;border-radius:0 0 4px 4px;background:var(--coral)}
+.tab:active svg{transform:scale(.9)}
+
+/* ------------------------------------------------------------------ chung */
+.card{background:var(--white);border:1px solid var(--line);border-radius:var(--r-lg);
+  padding:18px;box-shadow:var(--shadow);margin-bottom:14px}
+.card.flat{box-shadow:none}
+.sect{display:flex;align-items:center;gap:9px;margin:20px 2px 11px}
+.sect b{font-family:'Baloo 2',sans-serif;font-size:16px}
+.sect i{flex:1 1 auto;height:1px;background:var(--line);font-style:normal}
+.muted{color:var(--ink-soft);font-size:13.5px}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+  border-radius:100px;padding:14px 20px;font-weight:700;font-size:15px;
+  transition:transform .18s,box-shadow .2s,background .2s}
+.btn:active{transform:scale(.97)}
+.btn-1{background:var(--coral);color:#fff;box-shadow:0 12px 26px -10px rgba(238,140,106,.8)}
+.btn-1:active{background:var(--coral-dark)}
+.btn-2{background:var(--white);color:var(--ink);border:2px solid var(--line)}
+.btn-2:active{background:var(--green-soft);border-color:var(--green-dark);color:var(--green-dark)}
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chips span{font-size:12px;font-weight:600;color:var(--brown);background:var(--white);
+  border:1px solid var(--line);border-radius:100px;padding:6px 13px}
+
+/* ================================================================ TRANG CHỦ */
+.hero{position:relative;border-radius:var(--r-lg);overflow:hidden;margin-bottom:14px;
+  box-shadow:var(--shadow)}
+.hero img{width:100%}
+.hero .tag{position:absolute;left:12px;top:12px;background:rgba(255,255,255,.92);
+  border-radius:100px;padding:5px 13px;font-size:11.5px;font-weight:700;color:var(--coral-dark)}
+.intro h2{font-size:22px;margin-bottom:4px}
+.intro .sub{color:var(--coral-dark);font-weight:700;font-size:13.5px;margin-bottom:9px}
+.facts{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:14px 0 2px}
+.facts div{background:var(--paper);border-radius:var(--r-sm);padding:10px 6px;text-align:center}
+.facts b{display:block;font-family:'Baloo 2',sans-serif;font-size:19px;line-height:1.1;
+  color:var(--coral-dark)}
+.facts div:nth-child(2) b{color:var(--green-dark)}
+.facts div:nth-child(3) b{color:#C8901F}
+.facts span{font-size:10.5px;color:var(--ink-soft);font-weight:600}
+.quick{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.quick button{display:flex;align-items:center;gap:11px;background:var(--white);
+  border:1px solid var(--line);border-radius:var(--r-md);padding:13px;text-align:left;
+  font-weight:700;font-size:13.5px;transition:transform .18s}
+.quick button:active{transform:scale(.96)}
+.quick .ic{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;
+  flex:0 0 auto;color:#fff}
+.quick .ic svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;
+  stroke-linecap:round;stroke-linejoin:round}
+.quick button:nth-child(1) .ic{background:var(--coral)}
+.quick button:nth-child(2) .ic{background:var(--green-dark)}
+.quick button:nth-child(3) .ic{background:var(--yellow)}
+.quick button:nth-child(4) .ic{background:var(--peach)}
+.prod{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.prod div{background:linear-gradient(160deg,var(--cream),var(--coral-soft));
+  border-radius:var(--r-md);padding:12px;display:grid;place-items:center}
+.prod img{width:100%}
+
+/* ================================================================= GIEO */
+.dicewrap{display:flex;gap:16px;justify-content:center;padding:26px 0 6px}
+.die{width:104px;height:104px;border-radius:22px;padding:14px;display:grid;gap:5px;
+  grid-template:repeat(3,1fr)/repeat(3,1fr);box-shadow:0 16px 30px -14px rgba(64,48,42,.55)}
+.die.red{background:linear-gradient(150deg,#F0846C,#E05F49)}
+.die.yel{background:linear-gradient(150deg,#F6C46B,#E9A231)}
+.die i{width:17px;height:17px;border-radius:50%;background:#fff;opacity:0;
+  align-self:center;justify-self:center;box-shadow:inset 0 -2px 3px rgba(0,0,0,.14)}
+.die[data-v="1"] i:nth-child(5),
+.die[data-v="2"] i:nth-child(1),.die[data-v="2"] i:nth-child(9),
+.die[data-v="3"] i:nth-child(1),.die[data-v="3"] i:nth-child(5),.die[data-v="3"] i:nth-child(9),
+.die[data-v="4"] i:nth-child(1),.die[data-v="4"] i:nth-child(3),
+.die[data-v="4"] i:nth-child(7),.die[data-v="4"] i:nth-child(9),
+.die[data-v="5"] i:nth-child(1),.die[data-v="5"] i:nth-child(3),.die[data-v="5"] i:nth-child(5),
+.die[data-v="5"] i:nth-child(7),.die[data-v="5"] i:nth-child(9),
+.die[data-v="6"] i:nth-child(1),.die[data-v="6"] i:nth-child(3),.die[data-v="6"] i:nth-child(4),
+.die[data-v="6"] i:nth-child(6),.die[data-v="6"] i:nth-child(7),.die[data-v="6"] i:nth-child(9)
+{opacity:1}
+.die.roll{animation:tumble .5s cubic-bezier(.3,.7,.4,1)}
+.die.roll.b{animation-delay:.06s}
+@keyframes tumble{
+  0%{transform:none}
+  30%{transform:translateY(-26px) rotate(-18deg) scale(1.06)}
+  60%{transform:translateY(4px) rotate(14deg) scale(.97)}
+  100%{transform:none}}
+.sum{text-align:center;margin:16px 0 4px}
+.sum b{font-family:'Baloo 2',sans-serif;font-size:52px;line-height:1;color:var(--coral-dark);
+  display:block}
+.sum span{font-size:13px;color:var(--ink-soft);font-weight:600}
+/* phải thắng được .sum span ở trên, nếu không chữ trắng sẽ bị đổi thành xám */
+.sum span.pair{display:inline-block;margin-top:8px;background:var(--green-dark);color:#fff;
+  border-radius:100px;padding:5px 15px;font-size:12.5px;font-weight:700;
+  opacity:0;transform:scale(.8);transition:.3s cubic-bezier(.34,1.56,.64,1)}
+.sum span.pair.on{opacity:1;transform:none}
+.hist{display:flex;gap:7px;flex-wrap:wrap;justify-content:center;margin-top:6px;min-height:30px}
+.hist span{background:var(--paper);border:1px solid var(--line);border-radius:9px;
+  padding:4px 10px;font-size:12px;font-weight:700;color:var(--ink-soft)}
+.hist span:first-child{background:var(--coral-soft);border-color:transparent;color:#8A3A22}
+
+/* ================================================================= THẺ */
+.deck{display:flex;align-items:center;gap:14px;width:100%;background:var(--white);
+  border:1px solid var(--line);border-radius:var(--r-lg);padding:14px;text-align:left;
+  margin-bottom:11px;box-shadow:var(--shadow);transition:transform .18s}
+.deck:active{transform:scale(.975)}
+.deck .pic{position:relative;flex:0 0 auto;width:66px;height:88px}
+.deck .pic img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  border-radius:9px;box-shadow:0 10px 18px -10px rgba(64,48,42,.8)}
+.deck .pic .b1{transform:rotate(-8deg) translateX(-5px)}
+.deck .pic .b2{transform:rotate(6deg) translateX(5px)}
+.deck .txt{flex:1 1 auto;min-width:0}
+.deck h3{font-size:17px}
+.deck p{font-size:12.5px;color:var(--ink-soft);line-height:1.5}
+.deck .n{display:inline-block;margin-top:6px;font-size:11.5px;font-weight:700;
+  border-radius:100px;padding:3px 11px}
+.d-monan .n{background:var(--coral-soft);color:#8A3A22}
+.d-trungmanh .n{background:var(--green-soft);color:#2F6B47}
+.d-lokeo .n{background:var(--yellow-soft);color:#8A5D10}
+
+/* ngăn kéo hiện thẻ vừa rút */
+.sheet{position:absolute;inset:0;z-index:50;display:flex;align-items:flex-end;
+  opacity:0;visibility:hidden;transition:opacity .3s,visibility .3s}
+.sheet.on{opacity:1;visibility:visible}
+.sheet .veil{position:absolute;inset:0;background:rgba(46,34,26,.5)}
+.sheet .box{position:relative;width:100%;background:var(--paper);
+  border-radius:28px 28px 0 0;padding:12px 18px 24px;max-height:92%;overflow-y:auto;
+  transform:translateY(100%);transition:transform .4s cubic-bezier(.2,.9,.25,1)}
+.sheet.on .box{transform:none}
+.sheet .grip{width:42px;height:4px;border-radius:9px;background:rgba(64,48,42,.2);
+  margin:0 auto 14px}
+.sheet h3{text-align:center;font-size:19px}
+.sheet .lbl{text-align:center;font-size:12px;font-weight:700;margin-bottom:12px}
+.sheet .draw{display:grid;place-items:center;margin-bottom:16px;perspective:900px}
+.sheet .draw img{width:min(210px,60%);border-radius:14px;
+  box-shadow:0 22px 40px -18px rgba(64,48,42,.8);animation:flip .55s cubic-bezier(.2,.9,.25,1)}
+@keyframes flip{from{opacity:0;transform:rotateY(-72deg) translateY(24px) scale(.9)}
+  to{opacity:1;transform:none}}
+.sheet .row{display:flex;gap:10px}
+.sheet .row .btn{width:auto;flex:1 1 0}
+
+/* ================================================================= ĐIỂM */
+.setup{display:flex;gap:8px;margin-bottom:12px}
+.setup button{flex:1 1 0;border:2px solid var(--line);background:var(--white);
+  border-radius:var(--r-sm);padding:11px 0;font-weight:800;font-size:16px;
+  font-family:'Baloo 2',sans-serif;transition:.2s}
+.setup button.on{background:var(--coral);color:#fff;border-color:var(--coral)}
+.steps{display:flex;gap:6px;margin-bottom:14px}
+.steps button{flex:1 1 0;min-width:0;border:2px solid var(--line);background:var(--white);
+  border-radius:100px;padding:8px 0;font-weight:700;font-size:12.5px;transition:.2s}
+.steps button.on{background:var(--brown);color:#fff;border-color:var(--brown)}
+.plr{display:flex;align-items:center;gap:12px;background:var(--white);border:1px solid var(--line);
+  border-radius:var(--r-lg);padding:11px 13px;margin-bottom:10px;position:relative;overflow:hidden}
+.plr::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--c)}
+.plr .av{flex:0 0 auto;width:52px;height:52px;border-radius:50%;overflow:hidden;
+  background:var(--c)}
+/* cắt lấy phần đầu nhân vật — object-position cố định nên không phụ thuộc
+   vào việc ảnh cao bao nhiêu */
+.plr .av img{width:100%;height:100%;object-fit:cover;object-position:50% 6%}
+.plr .info{flex:1 1 auto;min-width:0}
+.plr .info b{display:block;font-family:'Baloo 2',sans-serif;font-size:15px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* số tiền là một nút — chạm vào để gõ số bất kỳ */
+.plr .info .money{display:inline-flex;align-items:center;gap:6px;
+  font-family:'Baloo 2',sans-serif;font-size:20px;line-height:1.15;
+  color:var(--ink);border-bottom:1.5px dashed rgba(64,48,42,.25);padding-bottom:1px}
+.plr .info .money:active{opacity:.55}
+.plr .info .money.low{color:#C4402A}
+.plr .info .money svg{width:13px;height:13px;flex:0 0 auto;opacity:.45;
+  fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.plr .ctl{flex:0 0 auto;display:flex;gap:7px}
+.plr .ctl button{width:38px;height:38px;border-radius:12px;font-size:20px;font-weight:700;
+  display:grid;place-items:center;line-height:1;transition:transform .15s}
+.plr .ctl button:active{transform:scale(.88)}
+.plr .ctl .minus{background:var(--coral-soft);color:#8A3A22}
+.plr .ctl .plus{background:var(--green-soft);color:#2F6B47}
+.plr.lead{box-shadow:0 0 0 2px var(--yellow),var(--shadow)}
+/* đặt vương miện sát mép avatar, không đè lên hai nút cộng/trừ bên phải */
+.plr .crown{position:absolute;left:50px;top:4px;font-size:14px;opacity:0;
+  filter:drop-shadow(0 2px 3px rgba(0,0,0,.3))}
+.plr.lead .crown{opacity:1}
+/* ngăn kéo gõ số tiền */
+.nsheet .who{display:flex;align-items:center;gap:11px;margin-bottom:14px}
+.nsheet .who .av{width:44px;height:44px;border-radius:50%;overflow:hidden;flex:0 0 auto;
+  background:var(--c,var(--green))}
+.nsheet .who .av img{width:100%;height:100%;object-fit:cover;object-position:50% 6%}
+.nsheet .who b{display:block;font-family:'Baloo 2',sans-serif;font-size:16px}
+.nsheet .who span{display:block;font-size:12.5px;color:var(--ink-soft)}
+.nsheet input{width:100%;border:2px solid var(--line);background:var(--white);
+  border-radius:var(--r-md);padding:13px 16px;font-family:'Baloo 2',sans-serif;font-weight:700;
+  font-size:27px;text-align:right;color:var(--ink);outline:none;transition:border-color .2s}
+.nsheet input:focus{border-color:var(--coral)}
+.nsheet .unit{text-align:right;font-size:11.5px;color:var(--ink-soft);margin:5px 3px 12px}
+/* lưới 5 cột cố định — dùng flex-wrap thì trên máy 320px chip thứ 5 rớt
+   xuống dòng rồi kéo dài hết chiều ngang, nhìn rất lệch */
+.nsheet .quick2{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:14px}
+.nsheet .quick2 button{min-width:0;border:1px solid var(--line);background:var(--white);
+  border-radius:100px;padding:7px 2px;font-size:12.5px;font-weight:700;color:var(--brown)}
+.nsheet .quick2 button:active{background:var(--cream)}
+.nsheet .acts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px}
+.nsheet .acts button{border-radius:var(--r-md);padding:13px 0;font-weight:700;font-size:14.5px;
+  transition:transform .15s}
+.nsheet .acts button:active{transform:scale(.95)}
+.nsheet .acts .sub{background:var(--coral-soft);color:#8A3A22}
+.nsheet .acts .set{background:var(--brown);color:#fff}
+.nsheet .acts .add{background:var(--green-soft);color:#2F6B47}
+
+.tot{display:flex;justify-content:space-between;align-items:center;background:var(--paper);
+  border-radius:var(--r-md);padding:12px 15px;font-size:13px;font-weight:600;
+  color:var(--ink-soft);margin-top:4px}
+.tot b{font-family:'Baloo 2',sans-serif;font-size:17px;color:var(--ink)}
+
+/* ================================================================= LUẬT */
+.rule{background:var(--white);border:1px solid var(--line);border-radius:var(--r-md);
+  margin-bottom:10px;overflow:hidden}
+.rule > button{display:flex;align-items:center;gap:12px;width:100%;padding:14px 15px;text-align:left}
+.rule .ic{width:40px;height:40px;border-radius:13px;display:grid;place-items:center;flex:0 0 auto;
+  transition:transform .35s cubic-bezier(.34,1.56,.64,1)}
+.rule .ic svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8;
+  stroke-linecap:round;stroke-linejoin:round}
+.rule.open .ic{transform:rotate(-8deg) scale(1.1)}
+/* dùng lớp rõ ràng, không dùng :nth-child — vì các thẻ .rule không phải là
+   toàn bộ con của màn hình nên số thứ tự sẽ lệch */
+.rule.r1 .ic{background:var(--coral-soft);color:#B4512F}
+.rule.r2 .ic{background:var(--yellow-soft);color:#B0781A}
+.rule.r3 .ic{background:var(--green-soft);color:#3E7A55}
+.rule.r4 .ic{background:#F6D9CC;color:#A8462A}
+.rule h3{flex:1 1 auto;font-size:16px}
+.rule .chev{width:26px;height:26px;border-radius:50%;background:var(--paper);flex:0 0 auto;
+  display:grid;place-items:center;color:var(--coral-dark);transition:transform .35s,background .2s}
+.rule .chev svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.6;
+  stroke-linecap:round;stroke-linejoin:round}
+.rule.open .chev{transform:rotate(180deg);background:var(--coral);color:#fff}
+.rule .body{display:grid;grid-template-rows:0fr;transition:grid-template-rows .38s cubic-bezier(.3,.8,.3,1)}
+.rule.open .body{grid-template-rows:1fr}
+.rule .body > div{overflow:hidden}
+.rule ul{list-style:none;padding:0 15px 15px 15px}
+.rule li{position:relative;padding-left:19px;font-size:13.5px;color:#5A4A42;margin-top:7px}
+.rule li::before{content:"";position:absolute;left:2px;top:8px;width:7px;height:7px;
+  border-radius:50%;background:var(--coral)}
+
+.toast{position:absolute;left:50%;bottom:calc(var(--bar) + 16px);transform:translate(-50%,14px);
+  background:var(--ink);color:#FFF6E9;border-radius:100px;padding:9px 18px;font-size:13px;
+  font-weight:600;z-index:45;opacity:0;visibility:hidden;transition:.3s;white-space:nowrap}
+.toast.on{opacity:1;visibility:visible;transform:translate(-50%,0)}
+</style>
+</head>
+<body>
+
+<div class="phone">
+
+  <!-- ══════════════════════ màn hình chờ ══════════════════════ -->
+  <div class="splash" id="splash">
+    <img src="assets/logo-header2.png" alt="Tỷ Phú Ẩm Thực">
+    <div class="bar"><i></i></div>
+    <p>Đang dọn bàn tiệc…</p>
+  </div>
+
+  <!-- ══════════════════════ thanh trên ══════════════════════ -->
+  <header class="appbar">
+    <img src="assets/logo-header2.png" alt="Tỷ Phú Ẩm Thực">
+    <div class="ttl"><b id="barTitle">Trang chủ</b><span id="barSub">Ứng dụng đồng hành</span></div>
+    <a class="out" href="index.html" title="Mở trang web đầy đủ" aria-label="Mở trang web đầy đủ">
+      <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+           stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 4h6v6M20 4l-8.4 8.4"/><path d="M18 14v5a1.6 1.6 0 0 1-1.6 1.6H5A1.6 1.6 0 0 1 3.4 19V7.6A1.6 1.6 0 0 1 5 6h5"/>
+      </svg>
+    </a>
+  </header>
+
+  <main class="screens">
+
+    <!-- ═══════════════════════ 1 · TRANG CHỦ ═══════════════════════ -->
+    <section class="screen on" id="s-home">
+      <div class="hero">
+        <span class="tag">Boardgame miền Tây Nam Bộ</span>
+        <img src="assets/hero-keyvisual.png" alt="Tỷ Phú Ẩm Thực">
+      </div>
+
+      <div class="card intro">
+        <h2>Tỷ Phú Ẩm Thực</h2>
+        <p class="sub">Lắc xúc xắc – Chạm hương vị</p>
+        <p class="muted">Lấy cảm hứng từ Cờ Tỷ Phú, bộ game đưa cả nhóm vào chuyến Food Tour
+           khám phá đặc sản miền Tây — trải nghiệm món ăn, tích lũy điểm và cạnh tranh để
+           trở thành Tỷ Phú Ẩm Thực.</p>
+        <div class="facts">
+          <div><b>2–5</b><span>người chơi</span></div>
+          <div><b>15–45'</b><span>phút mỗi ván</span></div>
+          <div><b>8+</b><span>tuổi</span></div>
+        </div>
+      </div>
+
+      <button class="btn btn-1" data-go="score" style="margin-bottom:16px">
+        Mở bảng điểm
+      </button>
+
+      <div class="sect"><b>Công cụ</b><i></i></div>
+      <div class="quick">
+        <button data-go="dice">
+          <span class="ic"><svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="4.6"/><circle cx="8.6" cy="8.6" r="1.5" fill="currentColor" stroke="none"/><circle cx="15.4" cy="15.4" r="1.5" fill="currentColor" stroke="none"/></svg></span>
+          Gieo xúc xắc</button>
+        <button data-go="cards">
+          <span class="ic"><svg viewBox="0 0 24 24"><rect x="8" y="4" width="12" height="16" rx="2.4"/><path d="M5.4 6.6 4.2 7.2A1.8 1.8 0 0 0 3.4 9.6l3.2 8.8"/></svg></span>
+          Rút thẻ bài</button>
+        <button data-go="score">
+          <span class="ic"><svg viewBox="0 0 24 24"><path d="M7 4h10v5a5 5 0 0 1-10 0Z"/><path d="M7 5.5H4.4v1.6A3 3 0 0 0 7 10M17 5.5h2.6v1.6A3 3 0 0 1 17 10"/><path d="M12 14v3.4M8.4 20.2h7.2"/></svg></span>
+          Bảng điểm</button>
+        <button data-go="rules">
+          <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 5.2A1.6 1.6 0 0 1 5.6 3.6H11A1.6 1.6 0 0 1 12 5v14a1.6 1.6 0 0 0-1-1.4H5.6A1.6 1.6 0 0 1 4 16V5.2Z"/><path d="M20 5.2a1.6 1.6 0 0 0-1.6-1.6H13A1.6 1.6 0 0 0 12 5v14a1.6 1.6 0 0 1 1-1.4h5.4A1.6 1.6 0 0 0 20 16V5.2Z"/></svg></span>
+          Luật chơi</button>
+      </div>
+
+      <div class="sect"><b>Trong hộp</b><i></i></div>
+      <div class="card flat">
+        <div class="prod">
+          <div><img src="assets/box-main1-cut.png" alt="Hộp Tỷ Phú Ẩm Thực"></div>
+          <div><img src="assets/box-main2-cut.png" alt="Hộp Tỷ Phú Ẩm Thực"></div>
+        </div>
+        <div class="chips" style="margin-top:12px">
+          <span>Bàn cờ 36 ô</span><span>24 thẻ món ăn</span><span>12 thẻ trúng mánh</span>
+          <span>12 thẻ lỡ kèo</span><span>5 quân nhân vật</span><span>2 xúc xắc</span>
+        </div>
+      </div>
+
+      <a class="btn btn-2" href="index.html#preorder" style="text-decoration:none">
+        Đặt trước bộ game ↗
+      </a>
+    </section>
+
+    <!-- ═══════════════════════ 2 · GIEO XÚC XẮC ═══════════════════════ -->
+    <section class="screen" id="s-dice">
+      <div class="card" style="text-align:center">
+        <div class="dicewrap">
+          <div class="die red" id="d1" data-v="3"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="die yel b" id="d2" data-v="4"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        </div>
+        <div class="sum">
+          <b id="dSum">7</b>
+          <span id="dTxt">3 + 4 — đi 7 bước</span><br>
+          <span class="pair" id="dPair">🎉 Gieo ra đôi — được đi thêm lượt!</span>
+        </div>
+      </div>
+
+      <button class="btn btn-1" id="rollBtn" style="margin-bottom:14px">🎲 &nbsp;Lắc xúc xắc</button>
+
+      <div class="sect"><b>Lượt gieo gần đây</b><i></i></div>
+      <div class="hist" id="dHist"></div>
+
+      <div class="card" style="margin-top:16px">
+        <p class="muted"><b style="color:var(--ink)">Mẹo:</b> gieo ra <b style="color:var(--coral-dark)">đôi</b>
+        (hai viên bằng nhau) là lúc dễ ăn trọn một khu vực nhất.</p>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════ 3 · THẺ BÀI ═══════════════════════ -->
+    <section class="screen" id="s-cards">
+      <p class="muted" style="margin:2px 2px 14px">Chạm vào một bộ để rút ngẫu nhiên một lá.</p>
+
+      <button class="deck d-monan" data-deck="monan">
+        <span class="pic">
+          <img class="b1" src="assets/card-monan-2.png" alt="">
+          <img class="b2" src="assets/card-monan-1.png" alt="Thẻ món ăn">
+        </span>
+        <span class="txt">
+          <h3>Thẻ Món ăn</h3>
+          <p>Khám phá món đặc trưng và tích lũy điểm trải nghiệm.</p>
+          <span class="n">24 thẻ</span>
+        </span>
+      </button>
+
+      <button class="deck d-trungmanh" data-deck="trungmanh">
+        <span class="pic">
+          <img class="b1" src="assets/card-trungmanh-2.png" alt="">
+          <img class="b2" src="assets/card-trungmanh-1.png" alt="Thẻ trúng mánh">
+        </span>
+        <span class="txt">
+          <h3>Thẻ Trúng Mánh</h3>
+          <p>Mang đến phần thưởng và lợi thế bất ngờ.</p>
+          <span class="n">12 thẻ</span>
+        </span>
+      </button>
+
+      <button class="deck d-lokeo" data-deck="lokeo">
+        <span class="pic">
+          <img class="b1" src="assets/card-lokeo-2.png" alt="">
+          <img class="b2" src="assets/card-lokeo-1.png" alt="Thẻ lỡ kèo">
+        </span>
+        <span class="txt">
+          <h3>Thẻ Lỡ Kèo</h3>
+          <p>Tạo các thử thách và tình huống bất lợi ngẫu nhiên.</p>
+          <span class="n">12 thẻ</span>
+        </span>
+      </button>
+
+      <div class="tot" style="margin-top:6px">
+        <span>Đã rút trong ván này</span><b id="drawN">0 lá</b>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════ 4 · BẢNG ĐIỂM ═══════════════════════ -->
+    <section class="screen" id="s-score">
+      <div class="sect" style="margin-top:2px"><b>Số người chơi</b><i></i></div>
+      <div class="setup" id="setup">
+        <button data-n="2">2</button><button data-n="3">3</button>
+        <button data-n="4">4</button><button data-n="5">5</button>
+      </div>
+
+      <div class="sect"><b>Mức cộng / trừ</b><i></i></div>
+      <div class="steps" id="steps">
+        <button data-s="10000">10k</button><button data-s="20000">20k</button>
+        <button data-s="50000">50k</button><button data-s="100000" class="on">100k</button>
+        <button data-s="200000">200k</button>
+      </div>
+      <p class="muted" style="margin:-6px 3px 12px;font-size:12px">
+        Chạm vào số tiền của một người để gõ số bất kỳ.</p>
+
+      <div id="players"></div>
+
+      <div class="tot"><span>Tổng tiền trên bàn</span><b id="totMoney">0</b></div>
+      <button class="btn btn-2" id="resetBtn" style="margin-top:14px">↻ &nbsp;Ván mới (về 200.000)</button>
+      <p class="muted" style="text-align:center;margin-top:10px;font-size:12px">
+        Điểm được lưu trên máy bạn, đóng app mở lại vẫn còn.</p>
+    </section>
+
+    <!-- ═══════════════════════ 5 · LUẬT CHƠI ═══════════════════════ -->
+    <section class="screen" id="s-rules">
+      <p class="muted" style="margin:2px 2px 14px">Luật bàn cờ, gọn trong bốn nhịp.</p>
+
+      <div class="rule r1">
+        <button type="button" aria-expanded="false">
+          <span class="ic"><svg viewBox="0 0 24 24"><path d="M4.6 8.4h14.8v10a1.8 1.8 0 0 1-1.8 1.8H6.4a1.8 1.8 0 0 1-1.8-1.8Z"/><path d="M3.4 5.4h17.2v3H3.4zM9.6 12.4h4.8"/></svg></span>
+          <h3>Chuẩn bị</h3>
+          <span class="chev"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span>
+        </button>
+        <div class="body"><div><ul>
+          <li>Đặt bàn cờ và các bộ thẻ ra bàn.</li>
+          <li>Mỗi người chọn 1 quân cờ (nhân vật).</li>
+          <li>Mỗi người nhận 200.000 tiền khởi đầu.</li>
+          <li>Đặt quân tại ô Xuất phát – Food Tour.</li>
+        </ul></div></div>
+      </div>
+
+      <div class="rule r2">
+        <button type="button" aria-expanded="false">
+          <span class="ic"><svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="4.6"/><circle cx="8.6" cy="8.6" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="15.4" cy="15.4" r="1.5" fill="currentColor" stroke="none"/></svg></span>
+          <h3>Cách chơi</h3>
+          <span class="chev"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span>
+        </button>
+        <div class="body"><div><ul>
+          <li>Tung 2 viên xúc xắc, di chuyển theo tổng số điểm.</li>
+          <li>Thực hiện hành động tại ô dừng chân.</li>
+          <li>Mua món ăn nếu muốn, thanh toán chi phí hoặc rút thẻ tương ứng.</li>
+          <li>Kết thúc lượt và chuyển cho người tiếp theo.</li>
+        </ul></div></div>
+      </div>
+
+      <div class="rule r3">
+        <button type="button" aria-expanded="false">
+          <span class="ic"><svg viewBox="0 0 24 24"><rect x="2.8" y="6.4" width="18.4" height="11.2" rx="2.4"/><circle cx="12" cy="12" r="2.8"/><path d="M6.2 12h.02M17.8 12h.02"/></svg></span>
+          <h3>Khi hết tiền</h3>
+          <span class="chev"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span>
+        </button>
+        <div class="body"><div><ul>
+          <li>Hạ cấp món ăn đang sở hữu để nhận lại tiền.</li>
+          <li>Bán hoặc trao đổi món ăn với người chơi khác.</li>
+          <li>Bán lại món ăn cho ngân hàng.</li>
+          <li>Vẫn không đủ tiền → dừng chuyến Food Tour và bị loại.</li>
+        </ul></div></div>
+      </div>
+
+      <div class="rule r4">
+        <button type="button" aria-expanded="false">
+          <span class="ic"><svg viewBox="0 0 24 24"><path d="m12 3.7 2.6 5.3 5.8.85-4.2 4.1 1 5.8-5.2-2.75L6.8 19.75l1-5.8-4.2-4.1 5.8-.85Z"/></svg></span>
+          <h3>Cấp độ món ăn</h3>
+          <span class="chev"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span>
+        </button>
+        <div class="body"><div><ul>
+          <li>Các món ăn thông thường chỉ có 1 cấp độ.</li>
+          <li>Mỗi cạnh bàn cờ có 4 món đặc biệt nâng lên được cấp 2.</li>
+          <li>Quét mã QR trên món ăn để mở nội dung cấp 2.</li>
+        </ul></div></div>
+      </div>
+
+      <div class="sect"><b>Bàn cờ</b><i></i></div>
+      <div class="card flat"><img src="assets/board.png" alt="Bàn cờ 36 ô" style="border-radius:14px">
+        <p class="muted" style="margin-top:10px">36 ô đi vòng qua bốn vùng ẩm thực miền Tây.</p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ══════════════════════ ngăn kéo thẻ ══════════════════════ -->
+  <div class="sheet" id="sheet">
+    <div class="veil" data-close></div>
+    <div class="box">
+      <div class="grip"></div>
+      <h3 id="shTitle">Thẻ Món ăn</h3>
+      <p class="lbl" id="shLbl">Lá bài vừa rút</p>
+      <div class="draw" id="shDraw"></div>
+      <div class="row">
+        <button class="btn btn-2" data-close>Đóng</button>
+        <button class="btn btn-1" id="again">Rút lá khác</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════ ngăn kéo gõ số tiền ══════════════════════ -->
+  <div class="sheet nsheet" id="numSheet">
+    <div class="veil" data-close></div>
+    <div class="box">
+      <div class="grip"></div>
+      <div class="who" id="nWho"></div>
+      <input id="nInput" type="text" inputmode="numeric" autocomplete="off"
+             aria-label="Số tiền" placeholder="0">
+      <p class="unit">đồng</p>
+      <div class="quick2">
+        <button data-q="10000">10k</button><button data-q="20000">20k</button>
+        <button data-q="50000">50k</button><button data-q="100000">100k</button>
+        <button data-q="200000">200k</button>
+      </div>
+      <div class="acts">
+        <button class="sub" id="nSub">− Trừ</button>
+        <button class="set" id="nSet">= Đặt</button>
+        <button class="add" id="nAdd">+ Cộng</button>
+      </div>
+      <button class="btn btn-2" data-close>Đóng</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- ══════════════════════ thanh tab dưới ══════════════════════ -->
+  <nav class="tabbar">
+    <button class="tab on" data-go="home">
+      <svg viewBox="0 0 24 24"><path d="M3.6 10.4 12 3.8l8.4 6.6V19a1.6 1.6 0 0 1-1.6 1.6H5.2A1.6 1.6 0 0 1 3.6 19Z"/><path d="M9.6 20.6v-6h4.8v6"/></svg>
+      Trang chủ</button>
+    <button class="tab" data-go="dice">
+      <svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="4.6"/><circle cx="8.6" cy="8.6" r="1.5" fill="currentColor" stroke="none"/><circle cx="15.4" cy="15.4" r="1.5" fill="currentColor" stroke="none"/></svg>
+      Gieo</button>
+    <button class="tab" data-go="cards">
+      <svg viewBox="0 0 24 24"><rect x="8" y="4" width="12" height="16" rx="2.4"/><path d="M5.4 6.6 4.2 7.2A1.8 1.8 0 0 0 3.4 9.6l3.2 8.8"/></svg>
+      Thẻ</button>
+    <button class="tab" data-go="score">
+      <svg viewBox="0 0 24 24"><path d="M7 4h10v5a5 5 0 0 1-10 0Z"/><path d="M7 5.5H4.4v1.6A3 3 0 0 0 7 10M17 5.5h2.6v1.6A3 3 0 0 1 17 10"/><path d="M12 14v3.4M8.4 20.2h7.2"/></svg>
+      Điểm</button>
+    <button class="tab" data-go="rules">
+      <svg viewBox="0 0 24 24"><path d="M4 5.2A1.6 1.6 0 0 1 5.6 3.6H11A1.6 1.6 0 0 1 12 5v14a1.6 1.6 0 0 0-1-1.4H5.6A1.6 1.6 0 0 1 4 16V5.2Z"/><path d="M20 5.2a1.6 1.6 0 0 0-1.6-1.6H13A1.6 1.6 0 0 0 12 5v14a1.6 1.6 0 0 1 1-1.4h5.4A1.6 1.6 0 0 0 20 16V5.2Z"/></svg>
+      Luật</button>
+  </nav>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var $  = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+
+  /* ------------------------------------------------------ màn hình chờ */
+  setTimeout(function () { document.body.classList.add('ready'); }, 1150);
+
+  /* ------------------------------------------------------ chuyển màn hình */
+  var TITLES = {
+    home:  ['Trang chủ', 'Ứng dụng đồng hành'],
+    dice:  ['Gieo xúc xắc', 'Hai viên — đỏ và vàng'],
+    cards: ['Thẻ bài', '48 lá chia ba bộ'],
+    score: ['Bảng điểm', 'Theo dõi tiền từng người'],
+    rules: ['Luật chơi', 'Bốn nhịp cơ bản']
+  };
+  function go(name) {
+    $$('.screen').forEach(function (s) { s.classList.toggle('on', s.id === 's-' + name); });
+    $$('.tab').forEach(function (t) { t.classList.toggle('on', t.getAttribute('data-go') === name); });
+    var t = TITLES[name] || TITLES.home;
+    $('#barTitle').textContent = t[0];
+    $('#barSub').textContent = t[1];
+    var scr = $('#s-' + name);
+    if (scr) scr.scrollTop = 0;
+  }
+  $$('[data-go]').forEach(function (b) {
+    b.addEventListener('click', function () { go(b.getAttribute('data-go')); });
+  });
+
+  /* ------------------------------------------------------ lời nhắc thoáng qua */
+  var toastT = 0;
+  function toast(msg) {
+    var el = $('#toast');
+    el.textContent = msg;
+    el.classList.add('on');
+    clearTimeout(toastT);
+    toastT = setTimeout(function () { el.classList.remove('on'); }, 1900);
+  }
+
+  /* ═══════════════════════════ 2 · GIEO XÚC XẮC ═══════════════════════════ */
+  var d1 = $('#d1'), d2 = $('#d2'), hist = [], rolling = false;
+  function roll() {
+    if (rolling) return;
+    rolling = true;
+    var a = 1 + Math.floor(Math.random() * 6);
+    var b = 1 + Math.floor(Math.random() * 6);
+    d1.classList.remove('roll'); d2.classList.remove('roll');
+    void d1.offsetWidth;
+    d1.classList.add('roll'); d2.classList.add('roll');
+    $('#dPair').classList.remove('on');
+
+    // đổi mặt giữa chừng cú tung cho giống lăn thật
+    var spin = setInterval(function () {
+      d1.dataset.v = 1 + Math.floor(Math.random() * 6);
+      d2.dataset.v = 1 + Math.floor(Math.random() * 6);
+    }, 70);
+
+    setTimeout(function () {
+      clearInterval(spin);
+      d1.dataset.v = a; d2.dataset.v = b;
+      $('#dSum').textContent = a + b;
+      $('#dTxt').textContent = a + ' + ' + b + ' — đi ' + (a + b) + ' bước';
+      if (a === b) $('#dPair').classList.add('on');
+      hist.unshift(a + '+' + b + '=' + (a + b));
+      hist = hist.slice(0, 6);
+      $('#dHist').innerHTML = hist.map(function (h) { return '<span>' + h + '</span>'; }).join('');
+      rolling = false;
+    }, 520);
+  }
+  $('#rollBtn').addEventListener('click', roll);
+  $('.dicewrap').addEventListener('click', roll);
+
+  /* ═══════════════════════════ 3 · THẺ BÀI ═══════════════════════════ */
+  var DECKS = {
+    monan:     { name: 'Thẻ Món ăn',     color: '#8A3A22',
+                 imgs: ['assets/card-monan-1.png', 'assets/card-monan-2.png'] },
+    trungmanh: { name: 'Thẻ Trúng Mánh', color: '#2F6B47',
+                 imgs: ['assets/card-trungmanh-1.png', 'assets/card-trungmanh-2.png'] },
+    lokeo:     { name: 'Thẻ Lỡ Kèo',     color: '#8A5D10',
+                 imgs: ['assets/card-lokeo-1.png', 'assets/card-lokeo-2.png'] }
+  };
+  var curDeck = 'monan', drawn = 0;
+
+  function draw(key) {
+    curDeck = key;
+    var d = DECKS[key];
+    $('#shTitle').textContent = d.name;
+    var lbl = $('#shLbl');
+    lbl.textContent = 'Lá bài vừa rút';
+    lbl.style.color = d.color;
+    var src = d.imgs[Math.floor(Math.random() * d.imgs.length)];
+    $('#shDraw').innerHTML = '<img src="' + src + '" alt="' + d.name + '">';
+    $('#sheet').classList.add('on');
+    drawn++;
+    $('#drawN').textContent = drawn + ' lá';
+  }
+  $$('[data-deck]').forEach(function (b) {
+    b.addEventListener('click', function () { draw(b.getAttribute('data-deck')); });
+  });
+  $('#again').addEventListener('click', function () { draw(curDeck); });
+  // đóng ngăn kéo — dùng chung cho mọi .sheet, không gắn cứng vào một cái
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('[data-close]') : null;
+    if (!b) return;
+    var sh = b.closest('.sheet');
+    if (sh) sh.classList.remove('on');
+  });
+
+  /* ═══════════════════════════ 4 · BẢNG ĐIỂM ═══════════════════════════ */
+  var CHARS = [
+    { n: 'Bông Bí',          c: '#AAD489', img: 'assets/char1.png' },
+    { n: 'Riềng Rong Ruổi',  c: '#F68F6B', img: 'assets/char2.png' },
+    { n: 'Hến Hí Hửng',      c: '#FDBB5D', img: 'assets/char3.png' },
+    { n: 'Bích Nụ',          c: '#E77364', img: 'assets/char4.png' },
+    { n: 'Xoài Xí Xọn',      c: '#4DAF7F', img: 'assets/char5.png' }
+  ];
+  var START = 200000, KEY = 'tpat-app-v1';
+  var state = { n: 4, step: 100000, money: [START, START, START, START, START] };
+
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+  }
+  function load() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      if (!raw) return;
+      var s = JSON.parse(raw);
+      // chỉ nhận dữ liệu đúng hình dạng, hỏng thì bỏ qua và chơi lại từ đầu
+      if (s && typeof s.n === 'number' && s.n >= 2 && s.n <= 5 &&
+          Object.prototype.toString.call(s.money) === '[object Array]' && s.money.length === 5) {
+        state = { n: s.n, step: s.step || 100000, money: s.money.map(Number) };
+      }
+    } catch (e) {}
+  }
+
+  var fmt = function (v) { return v.toLocaleString('vi-VN'); };
+
+  function paint() {
+    $$('#setup button').forEach(function (b) {
+      b.classList.toggle('on', +b.getAttribute('data-n') === state.n);
+    });
+    $$('#steps button').forEach(function (b) {
+      b.classList.toggle('on', +b.getAttribute('data-s') === state.step);
+    });
+
+    var top = -Infinity, i;
+    for (i = 0; i < state.n; i++) if (state.money[i] > top) top = state.money[i];
+
+    var html = '', total = 0;
+    for (i = 0; i < state.n; i++) {
+      var c = CHARS[i], m = state.money[i];
+      total += m;
+      html += '<div class="plr' + (m === top && state.n > 1 ? ' lead' : '') +
+              '" style="--c:' + c.c + '">' +
+                '<span class="crown">👑</span>' +
+                '<span class="av"><img src="' + c.img + '" alt=""></span>' +
+                '<span class="info"><b>' + c.n + '</b>' +
+                  '<button class="money' + (m < 0 ? ' low' : '') + '" data-edit="' + i + '">' +
+                    fmt(m) +
+                    '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+                      '<path d="M4 20h4.2L19 9.2a2 2 0 0 0 0-2.8l-1.4-1.4a2 2 0 0 0-2.8 0L4 15.8Z"/>' +
+                    '</svg>' +
+                  '</button></span>' +
+                '<span class="ctl">' +
+                  '<button class="minus" data-i="' + i + '" data-d="-1" aria-label="Trừ tiền">−</button>' +
+                  '<button class="plus"  data-i="' + i + '" data-d="1"  aria-label="Cộng tiền">+</button>' +
+                '</span>' +
+              '</div>';
+    }
+    $('#players').innerHTML = html;
+    $('#totMoney').textContent = fmt(total);
+
+    $$('#players button[data-i]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var i = +b.getAttribute('data-i');
+        state.money[i] += (+b.getAttribute('data-d')) * state.step;
+        save(); paint();
+      });
+    });
+    $$('#players button[data-edit]').forEach(function (b) {
+      b.addEventListener('click', function () { openNum(+b.getAttribute('data-edit')); });
+    });
+  }
+
+  /* ---------- gõ số tiền bất kỳ ---------- */
+  var numIdx = 0, nIn = $('#nInput');
+
+  // chỉ giữ chữ số, thêm dấu chấm ngăn nghìn cho dễ đọc
+  function pretty(s) {
+    var neg = /^\s*-/.test(s);
+    var d = String(s).replace(/[^\d]/g, '');
+    if (!d) return neg ? '-' : '';
+    return (neg ? '-' : '') + Number(d).toLocaleString('vi-VN');
+  }
+  function numVal() {
+    var neg = /^\s*-/.test(nIn.value);
+    var n = parseInt(nIn.value.replace(/[^\d]/g, ''), 10);
+    if (isNaN(n)) n = 0;
+    return neg ? -n : n;
+  }
+  function openNum(i) {
+    numIdx = i;
+    var c = CHARS[i];
+    $('#nWho').innerHTML =
+      '<span class="av" style="background:' + c.c + '"><img src="' + c.img + '" alt=""></span>' +
+      '<span><b>' + c.n + '</b><span>Đang có ' + fmt(state.money[i]) + ' đồng</span></span>';
+    nIn.value = pretty(String(state.money[i]));
+    $('#numSheet').classList.add('on');
+    setTimeout(function () { nIn.focus(); nIn.select(); }, 320);
+  }
+  function applyNum(mode) {
+    var v = numVal(), i = numIdx;
+    if (mode === 'set')      state.money[i] = v;
+    else if (mode === 'add') state.money[i] += Math.abs(v);
+    else                     state.money[i] -= Math.abs(v);
+    save(); paint();
+    $('#numSheet').classList.remove('on');
+    toast(CHARS[i].n + ': ' + fmt(state.money[i]));
+  }
+
+  nIn.addEventListener('input', function () {
+    var p = pretty(nIn.value);
+    if (p !== nIn.value) {
+      nIn.value = p;
+      try { nIn.setSelectionRange(p.length, p.length); } catch (e) {}
+    }
+  });
+  $$('.quick2 button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      nIn.value = pretty(b.getAttribute('data-q'));
+      nIn.focus();
+    });
+  });
+  $('#nSet').addEventListener('click', function () { applyNum('set'); });
+  $('#nAdd').addEventListener('click', function () { applyNum('add'); });
+  $('#nSub').addEventListener('click', function () { applyNum('sub'); });
+  nIn.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); applyNum('set'); }
+  });
+
+  $$('#setup button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      state.n = +b.getAttribute('data-n'); save(); paint();
+    });
+  });
+  $$('#steps button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      state.step = +b.getAttribute('data-s'); save(); paint();
+    });
+  });
+  $('#resetBtn').addEventListener('click', function () {
+    state.money = [START, START, START, START, START];
+    save(); paint(); drawn = 0; $('#drawN').textContent = '0 lá';
+    toast('Đã bắt đầu ván mới');
+  });
+
+  load();
+  paint();
+
+  /* ═══════════════════════════ 5 · LUẬT CHƠI ═══════════════════════════ */
+  $$('.rule > button').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var card = btn.parentNode, open = card.classList.contains('open');
+      $$('.rule').forEach(function (r) {
+        r.classList.remove('open');
+        $('button', r).setAttribute('aria-expanded', 'false');
+      });
+      if (!open) { card.classList.add('open'); btn.setAttribute('aria-expanded', 'true'); }
+    });
+  });
+  $('.rule').classList.add('open');
+  $('.rule > button').setAttribute('aria-expanded', 'true');
+})();
+</script>
+
+</body>
+</html>
